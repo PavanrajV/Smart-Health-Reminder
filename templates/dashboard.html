@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="container">
+    <h2>Welcome, {{ session['username'] }}</h2>
+    <a href="/logout">Logout</a>
+    <h3>Add Reminder</h3>
+    <form method="POST">
+        <select name="type" required>
+            <option value="Medicine">Medicine</option>
+            <option value="Water">Water</option>
+            <option value="Exercise">Exercise</option>
+        </select><br>
+        <input type="text" name="name" placeholder="Medicine/Activity Name" required><br>
+        <input type="text" name="dosage" placeholder="Dosage / Quantity / Duration" required><br>
+        <input type="time" name="time" required><br>
+        <button type="submit">Add</button>
+    </form>
+<h3>Reminder Check Interval</h3>
+<label for="interval">Check every:</label>
+<input type="number" id="intervalInput" value="1" min="1">
+<select id="intervalUnit">
+    <option value="seconds">Seconds</option>
+    <option value="minutes" selected>Minutes</option>
+</select>
+<button onclick="updateInterval()">Set Interval</button>
+
+    <h3>Today's Reminders</h3>
+    <table border="1">
+        <tr><th>Type</th><th>Name</th><th>Dosage</th><th>Time</th><th>Status</th><th>Action</th></tr>
+        {% for r in reminders %}
+        <tr>
+            <td>{{ r[2] }}</td>
+            <td>{{ r[3] }}</td>
+            <td>{{ r[4] }}</td>
+            <td>{{ r[5] }}</td>
+            <td>{{ r[6] }}</td>
+            <td>
+                {% if r[6] != 'done' %}
+                <a href="/done/{{ r[0] }}">Mark Done</a>
+                {% else %}
+                Completed
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    <a href="/summary">View Daily Summary</a>
+</div>
+<script>
+let intervalTime = 60000; // default 1 minute
+let intervalId;
+
+// Function to check reminders
+function checkReminders() {
+    fetch('/get_reminders')
+    .then(response => response.json())
+    .then(data => {
+        const now = new Date();
+        const currentTime = now.getHours().toString().padStart(2,'0') + ":" + now.getMinutes().toString().padStart(2,'0');
+
+        data.forEach(reminder => {
+            if(reminder.time === currentTime && reminder.status === 'pending') {
+                // Popup alert
+                alert("Reminder: " + reminder.type + " - " + reminder.name + " (" + reminder.dosage + ")");
+                // Voice message
+                fetch('/speak/' + reminder.id);
+            }
+        });
+    });
+}
+
+// Start interval
+function startInterval() {
+    intervalId = setInterval(checkReminders, intervalTime);
+}
+
+// Update interval dynamically
+function updateInterval() {
+    const val = document.getElementById('intervalInput').value;
+    const unit = document.getElementById('intervalUnit').value;
+    
+    let timeMs = parseInt(val);
+    if(unit === 'minutes') timeMs *= 60000; // convert to milliseconds
+    if(unit === 'seconds') timeMs *= 1000;  // convert to milliseconds
+    
+    intervalTime = timeMs;
+    
+    if(intervalId) clearInterval(intervalId); // clear previous interval
+    startInterval();
+}
+
+// Start with default interval
+startInterval();
+</script>
+
+</body>
+</html>
