@@ -1,14 +1,722 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Smart Health Reminder</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Health Reminder — AI Companion</title>
+<link rel="stylesheet" href="/static/css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💊</text></svg>">
 </head>
 <body>
-    <div class="container">
-        <h1>Welcome to Smart Health Reminder</h1>
-        <a href="/register" class="btn">Register</a>
-        <a href="/login" class="btn">Login</a>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!--   SETUP SCREEN                                                          -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<div id="setup-screen" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);padding:24px;">
+  <div style="width:580px;max-width:100%;">
+
+    <!-- Brand -->
+    <div style="text-align:center;margin-bottom:36px;">
+      <div style="font-size:3.5rem;margin-bottom:10px;">💊</div>
+      <div style="font-family:'DM Serif Display',serif;font-size:2.2rem;color:#0f172a;">Smart Health Reminder</div>
+      <div style="color:#64748b;margin-top:6px;font-size:.95rem;font-weight:600;">AI-Powered · Multilingual · Adaptive Learning</div>
+      <div style="display:flex;justify-content:center;gap:16px;margin-top:12px;">
+        <span id="badge-ocr"  style="font-size:.75rem;font-weight:700;"></span>
+        <span id="badge-tts"  style="font-size:.75rem;font-weight:700;"></span>
+        <span id="badge-sched"style="font-size:.75rem;font-weight:700;"></span>
+      </div>
     </div>
+
+    <!-- Existing user select -->
+    <div id="existing-user-section" style="display:none;margin-bottom:20px;">
+      <div class="card" style="padding:20px;">
+        <div class="card-title mb-2">👤 Continue as existing user</div>
+        <div class="d-flex gap-2">
+          <select id="existing-users" class="form-control flex-1">
+            <option value="">— Select user —</option>
+          </select>
+          <button class="btn-primary" onclick="selectExistingUser()">Login</button>
+        </div>
+        <div class="separator"></div>
+        <div style="font-size:.8rem;color:var(--text-3);text-align:center;font-weight:600;">— OR CREATE NEW PROFILE —</div>
+      </div>
+    </div>
+
+    <!-- New profile form -->
+    <div class="card">
+      <div style="font-family:'DM Serif Display',serif;font-size:1.4rem;margin-bottom:22px;">Create Your Health Profile</div>
+      <form onsubmit="createProfile(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Full Name *</label>
+            <input name="name" class="form-control" placeholder="e.g. Priya Sharma" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Age</label>
+            <input name="age" type="number" class="form-control" placeholder="25" min="1" max="120">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Gender</label>
+            <select name="gender" class="form-control">
+              <option value="">Prefer not to say</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Health Condition</label>
+            <select name="condition" class="form-control" required>
+              <option value="general">General Health</option>
+              <option value="diabetes">Diabetes</option>
+              <option value="blood pressure">Blood Pressure (BP)</option>
+              <option value="heart disease">Heart Disease</option>
+              <option value="asthma">Asthma</option>
+              <option value="thyroid">Thyroid</option>
+              <option value="obesity">Obesity</option>
+              <option value="anxiety">Anxiety / Stress</option>
+              <option value="arthritis">Arthritis</option>
+              <option value="post-surgery">Post-Surgery Recovery</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Wake-Up Time</label>
+            <input name="wake_time" type="time" class="form-control" value="06:30">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Sleep Time</label>
+            <input name="sleep_time" type="time" class="form-control" value="22:00">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Preferred Language</label>
+            <select name="language" class="form-control">
+              <option value="en">🇺🇸 English</option>
+              <option value="kn">🇮🇳 Kannada</option>
+              <option value="te">🇮🇳 Telugu</option>
+              <option value="hi">🇮🇳 Hindi</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Caregiver Contact (optional)</label>
+            <input name="caregiver" class="form-control" placeholder="Phone or email">
+          </div>
+        </div>
+        <button type="submit" class="btn-primary" style="width:100%;padding:14px;font-size:1rem;">
+          🚀 Create Profile &amp; Generate Schedule
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!--   MAIN APP SHELL                                                        -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<div id="app-shell" style="display:none;">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon">💊</div>
+      <div class="brand-name">HealthMate</div>
+      <div class="brand-sub">AI Health Companion</div>
+    </div>
+
+    <div class="nav-section">Overview</div>
+    <div class="nav-item active" data-page="dashboard" onclick="showPage('dashboard')">
+      <span class="icon">🏠</span> Dashboard
+    </div>
+    <div class="nav-item" data-page="reminders" onclick="showPage('reminders')">
+      <span class="icon">⏰</span> Reminders
+      <span class="nav-badge" id="reminder-badge" style="display:none">0</span>
+    </div>
+
+    <div class="nav-section">Health Tracking</div>
+    <div class="nav-item" data-page="medicines" onclick="showPage('medicines')">
+      <span class="icon">💊</span> Medicines
+    </div>
+    <div class="nav-item" data-page="hydration" onclick="showPage('hydration')">
+      <span class="icon">💧</span> Hydration
+    </div>
+    <div class="nav-item" data-page="exercise" onclick="showPage('exercise')">
+      <span class="icon">🏃</span> Exercise
+    </div>
+
+    <div class="nav-section">Smart Features</div>
+    <div class="nav-item" data-page="ocr" onclick="showPage('ocr')">
+      <span class="icon">📷</span> Scan Prescription
+    </div>
+    <div class="nav-item" data-page="reports" onclick="showPage('reports')">
+      <span class="icon">📊</span> Reports &amp; AI
+    </div>
+    <div class="nav-item" data-page="caregiver" onclick="showPage('caregiver')">
+      <span class="icon">🚨</span> Caregiver Alerts
+    </div>
+
+    <div class="nav-section">Account</div>
+    <div class="nav-item" data-page="settings" onclick="showPage('settings')">
+      <span class="icon">⚙️</span> Settings
+    </div>
+
+    <div class="sidebar-user">
+      <div class="user-avatar" id="user-avatar-letter">U</div>
+      <div>
+        <div class="user-name" id="user-display-name">User</div>
+        <div class="user-cond" id="user-display-cond">General Health</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main">
+
+    <!-- TOP BAR -->
+    <div class="topbar">
+      <div class="d-flex align-center gap-3">
+        <div class="page-title" id="page-title">Dashboard</div>
+      </div>
+      <div class="topbar-right">
+        <div class="live-time" id="live-clock">00:00:00</div>
+        <div class="status-pill">🟢 Active</div>
+        <button class="btn-secondary btn-sm" onclick="testVoice()">🔊 Test Voice</button>
+        <button class="btn-secondary btn-sm" onclick="stopSpeech()">■ Stop</button>
+      </div>
+    </div>
+
+    <!-- VOICE INDICATOR (global) -->
+    <div class="voice-indicator" style="margin:0 28px 0;border-radius:0 0 10px 10px;">
+      <div class="wave-bars"><span></span><span></span><span></span><span></span><span></span></div>
+      🗣️ Speaking...
+    </div>
+
+    <!-- ── DASHBOARD PAGE ── -->
+    <div class="page active" id="page-dashboard">
+
+      <!-- Stats row -->
+      <div class="stat-grid">
+        <div class="stat-card teal">
+          <div class="stat-icon">📋</div>
+          <div class="stat-num teal" id="stat-total">0</div>
+          <div class="stat-label">Today's Reminders</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-icon">✅</div>
+          <div class="stat-num green" id="stat-done">0</div>
+          <div class="stat-label">Completed</div>
+        </div>
+        <div class="stat-card amber">
+          <div class="stat-icon">⏳</div>
+          <div class="stat-num amber" id="stat-pending">0</div>
+          <div class="stat-label">Pending</div>
+        </div>
+        <div class="stat-card blue">
+          <div class="stat-icon">💧</div>
+          <div class="stat-num blue" id="stat-water">0</div>
+          <div class="stat-label">Glasses of Water</div>
+        </div>
+      </div>
+
+      <div class="dash-grid">
+        <!-- Left: Reminders + Tips -->
+        <div>
+          <!-- Progress -->
+          <div class="card mb-3">
+            <div class="card-header">
+              <div class="card-title"><span class="icon">📈</span> Today's Progress</div>
+              <span id="dash-progress-pct" style="font-weight:700;color:var(--primary-d)">0%</span>
+            </div>
+            <div class="progress-bar"><div class="progress-fill" id="dash-progress" style="width:0%"></div></div>
+          </div>
+
+          <!-- Upcoming reminders -->
+          <div class="card mb-3">
+            <div class="card-header">
+              <div class="card-title"><span class="icon">⏰</span> Upcoming Reminders</div>
+              <button class="btn-secondary btn-sm" onclick="showPage('reminders')">View All →</button>
+            </div>
+            <div class="reminder-list" id="upcoming-reminders">
+              <div class="empty-state"><div class="icon">🎉</div><p>Loading...</p></div>
+            </div>
+          </div>
+
+          <!-- Adaptive alert -->
+          <div id="dash-adaptive"></div>
+
+          <!-- Condition alerts -->
+          <div id="condition-alerts"></div>
+        </div>
+
+        <!-- Right: Score + Tips -->
+        <div>
+          <!-- Health Score -->
+          <div class="card mb-3">
+            <div class="card-title mb-3"><span class="icon">🏆</span> Health Score</div>
+            <div class="score-ring-wrap">
+              <div class="score-ring">
+                <svg width="160" height="160" viewBox="0 0 160 160">
+                  <circle class="bg-circle" cx="80" cy="80" r="70"/>
+                  <circle class="fg-circle" id="score-circle" cx="80" cy="80" r="70"
+                    stroke-dasharray="439.8" stroke-dashoffset="439.8"/>
+                </svg>
+                <div class="score-text">
+                  <div class="score-big" id="score-num">0</div>
+                  <div class="score-grade" id="score-grade">—</div>
+                </div>
+              </div>
+              <div class="score-label-tag" id="score-tag">Calculating...</div>
+            </div>
+          </div>
+
+          <!-- Health Tips -->
+          <div class="card">
+            <div class="card-title mb-3"><span class="icon">💡</span> Personalized Tips</div>
+            <div id="health-tips">
+              <div class="text-muted text-center">Loading tips...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── REMINDERS PAGE ── -->
+    <div class="page" id="page-reminders">
+      <div class="d-flex align-center gap-2 mb-3">
+        <select id="reminder-filter" class="form-control flex-1" onchange="loadReminders()" style="max-width:200px">
+          <option value="all">All Reminders</option>
+          <option value="medicine">💊 Medicine Only</option>
+          <option value="due">🔴 Due Now</option>
+          <option value="pending">⏳ Pending</option>
+        </select>
+        <button id="generate-btn" class="btn-primary btn-sm" onclick="generateSchedule()">🔄 Regenerate Schedule</button>
+        <button class="btn-secondary btn-sm" onclick="loadReminders()">↺ Refresh</button>
+      </div>
+
+      <div class="alert-banner info mb-3">
+        <span>ℹ️</span> Reminders are auto-generated based on your health profile and medicines. Click <b>Done / Snooze / Skip</b> to respond.
+      </div>
+
+      <div class="card">
+        <div class="reminder-list" id="reminder-list">
+          <div class="empty-state"><div class="icon">⏰</div><p>Loading reminders...</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MEDICINES PAGE ── -->
+    <div class="page" id="page-medicines">
+      <div class="d-flex align-center gap-2 mb-3">
+        <button class="btn-primary" onclick="openModal('med-modal')">+ Add Medicine</button>
+        <button class="btn-secondary" onclick="loadMedicines()">↺ Refresh</button>
+      </div>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="card-title mb-3"><span class="icon">💊</span> Your Medicines</div>
+          <div id="med-list">
+            <div class="empty-state"><div class="icon">💊</div><p>No medicines yet. Add one or scan a prescription.</p></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title mb-3"><span class="icon">📋</span> Medicine Tips</div>
+          <div class="alert-banner info mb-2"><span>⏰</span> Take medicines at the same time daily for best results.</div>
+          <div class="alert-banner success mb-2"><span>💧</span> Always take with a full glass of water unless specified.</div>
+          <div class="alert-banner warning mb-2"><span>⚠️</span> Never skip HIGH priority medicines without consulting your doctor.</div>
+          <div class="alert-banner info"><span>📷</span> Scan your doctor's prescription to auto-add medicines!</div>
+          <div class="mt-4">
+            <button class="btn-primary" style="width:100%" onclick="showPage('ocr')">📷 Scan Prescription</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── HYDRATION PAGE ── -->
+    <div class="page" id="page-hydration">
+      <div class="two-col">
+        <div class="card">
+          <div class="card-title mb-3"><span class="icon">💧</span> Today's Hydration</div>
+
+          <div style="text-align:center;margin:20px 0;">
+            <div style="font-family:'DM Serif Display',serif;font-size:3.5rem;color:var(--blue)" id="hydration-pct">0%</div>
+            <div id="hydration-count" style="color:var(--text-3);font-weight:600;margin-top:4px;">0 / 8 glasses</div>
+          </div>
+
+          <div class="progress-bar mb-3">
+            <div class="progress-fill blue" id="hydration-bar" style="width:0%;background:linear-gradient(90deg,#3b82f6,#60a5fa)"></div>
+          </div>
+
+          <div style="text-align:center;margin-bottom:20px;font-weight:700;color:var(--text-2)" id="hydration-msg">Loading...</div>
+
+          <div class="water-grid" id="water-grid" style="justify-content:center;"></div>
+
+          <div style="margin-top:24px;text-align:center;">
+            <button class="btn-primary" onclick="logGlass()" style="padding:14px 40px;font-size:1rem;">
+              💧 Log a Glass
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <div class="card mb-3">
+            <div class="card-title mb-3"><span class="icon">🌡️</span> Hydration Science</div>
+            <div class="alert-banner info mb-2"><span>🧠</span> Your brain is 75% water — stay sharp!</div>
+            <div class="alert-banner success mb-2"><span>⚡</span> Proper hydration boosts energy levels by 30%.</div>
+            <div class="alert-banner warning mb-2"><span>🌿</span> Dehydration causes headaches & fatigue.</div>
+            <div class="alert-banner info"><span>🏃</span> Drink extra water after exercise.</div>
+          </div>
+          <div class="card">
+            <div class="card-title mb-3"><span class="icon">💡</span> Hydration Tips</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;">
+              <span class="tip-chip">☀️ Drink water on wake-up</span>
+              <span class="tip-chip">🍋 Add lemon for flavor</span>
+              <span class="tip-chip">🌊 Carry a water bottle</span>
+              <span class="tip-chip">⏰ Set hourly reminders</span>
+              <span class="tip-chip">🥤 Track with this app</span>
+              <span class="tip-chip">🌱 Eat water-rich foods</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── EXERCISE PAGE ── -->
+    <div class="page" id="page-exercise">
+      <div class="two-col">
+        <div class="card">
+          <div class="card-title mb-3"><span class="icon">🏃</span> Recommended Activities</div>
+          <div id="exercise-tips">
+            <div class="empty-state"><div class="icon">🏃</div><p>Loading exercise plan...</p></div>
+          </div>
+          <div class="separator"></div>
+          <div class="card-title mb-3">Quick Log Exercise</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <button class="btn-primary" onclick="logExercise('Walking 30 min')">🚶 Walking</button>
+            <button class="btn-primary" onclick="logExercise('Yoga 20 min')">🧘 Yoga</button>
+            <button class="btn-primary" onclick="logExercise('Cycling 20 min')">🚴 Cycling</button>
+            <button class="btn-primary" onclick="logExercise('Strength Training 30 min')">💪 Strength</button>
+            <button class="btn-primary" onclick="logExercise('Swimming 30 min')">🏊 Swimming</button>
+            <button class="btn-primary" onclick="logExercise('Running 20 min')">🏃 Running</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="card mb-3">
+            <div class="card-title mb-3"><span class="icon">📊</span> Exercise Benefits</div>
+            <div class="form-group">
+              <label class="form-label">Cardiovascular Health</label>
+              <div class="progress-bar"><div class="progress-fill" style="width:85%"></div></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Mental Wellbeing</label>
+              <div class="progress-bar"><div class="progress-fill purple" style="width:90%;background:linear-gradient(90deg,#8b5cf6,#a78bfa)"></div></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Weight Management</label>
+              <div class="progress-bar"><div class="progress-fill amber" style="width:75%"></div></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Immune System</label>
+              <div class="progress-bar"><div class="progress-fill" style="width:80%"></div></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title mb-3"><span class="icon">💡</span> Exercise Science</div>
+            <div class="alert-banner success mb-2"><span>🏃</span> 30 mins/day reduces disease risk by 50%.</div>
+            <div class="alert-banner info mb-2"><span>🧠</span> Exercise releases endorphins — your natural mood booster.</div>
+            <div class="alert-banner warning"><span>⚠️</span> Consult doctor before starting if you have a heart condition.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── OCR PAGE ── -->
+    <div class="page" id="page-ocr">
+      <div class="two-col">
+        <div class="card">
+          <div class="card-title mb-3"><span class="icon">📷</span> Prescription Scanner</div>
+
+          <div class="alert-banner info mb-3">
+            <span>🤖</span> Upload your doctor's prescription to automatically extract medicines and create reminders!
+          </div>
+
+          <div class="ocr-drop" id="ocr-drop">
+            <div class="ocr-icon">📋</div>
+            <div class="ocr-text">Drop prescription image here</div>
+            <div class="ocr-sub">or click to browse · JPG, PNG, PDF supported</div>
+          </div>
+          <input type="file" id="ocr-file" accept="image/*,application/pdf" style="display:none">
+
+          <div id="ocr-status" style="margin-top:16px;"></div>
+        </div>
+
+        <div>
+          <div class="card mb-3">
+            <div class="card-title mb-3"><span class="icon">🔬</span> OCR Technology</div>
+            <div class="alert-banner {% if ocr_available %}success{% else %}warning{% endif %} mb-2">
+              <span>{% if ocr_available %}✅{% else %}⚠️{% endif %}</span>
+              Tesseract OCR: <b>{% if ocr_available %}Available{% else %}Demo Mode{% endif %}</b>
+            </div>
+            <div style="font-size:.82rem;color:var(--text-2);line-height:1.7;">
+              <p><b>How it works:</b></p>
+              <p>① Upload prescription image</p>
+              <p>② AI extracts medicine names, dosages &amp; timings</p>
+              <p>③ Reminders are auto-created</p>
+              <p>④ Schedule is regenerated for you</p>
+              {% if not ocr_available %}
+              <div class="alert-banner warning mt-3">
+                <span>📦</span> Install real OCR: <code>pip install pytesseract Pillow</code>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title mb-3"><span class="icon">📝</span> Supported Formats</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;">
+              <span class="tip-chip">📸 JPG / PNG</span>
+              <span class="tip-chip">📄 Printed text</span>
+              <span class="tip-chip">🏥 Hospital prescriptions</span>
+              <span class="tip-chip">💊 Medicine strips</span>
+              <span class="tip-chip">🖨️ Digital prescriptions</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── REPORTS PAGE ── -->
+    <div class="page" id="page-reports">
+      <div class="two-col">
+        <!-- Score + breakdown -->
+        <div>
+          <div class="card mb-3">
+            <div class="card-title mb-3"><span class="icon">🏆</span> Today's Health Score</div>
+            <div style="text-align:center;margin:10px 0 20px;">
+              <div style="font-family:'DM Serif Display',serif;font-size:4rem;color:var(--primary-d)" id="report-score">0</div>
+              <div style="font-weight:700;color:var(--text-2)" id="report-grade">—</div>
+            </div>
+
+            <div class="form-group">
+              <div class="d-flex align-center mb-2">
+                <label class="form-label" style="margin:0">💊 Medicine Score</label>
+                <span class="ml-auto fw-700" id="bar-medicine-pct">0%</span>
+              </div>
+              <div class="progress-bar"><div class="progress-fill" id="bar-medicine" style="width:0%"></div></div>
+            </div>
+            <div class="form-group">
+              <div class="d-flex align-center mb-2">
+                <label class="form-label" style="margin:0">💧 Hydration Score</label>
+                <span class="ml-auto fw-700" id="bar-hydration-pct">0%</span>
+              </div>
+              <div class="progress-bar"><div class="progress-fill blue" id="bar-hydration" style="width:0%;background:linear-gradient(90deg,#3b82f6,#60a5fa)"></div></div>
+            </div>
+            <div class="form-group">
+              <div class="d-flex align-center mb-2">
+                <label class="form-label" style="margin:0">📋 Overall Compliance</label>
+                <span class="ml-auto fw-700" id="bar-compliance-pct">0%</span>
+              </div>
+              <div class="progress-bar"><div class="progress-fill amber" id="bar-compliance" style="width:0%"></div></div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px;">
+              <div class="stat-card green" style="padding:12px;text-align:center;">
+                <div class="stat-num green" style="font-size:1.5rem" id="stat-completed-r">0</div>
+                <div class="stat-label">Completed</div>
+              </div>
+              <div class="stat-card" style="padding:12px;text-align:center;">
+                <div class="stat-num" style="font-size:1.5rem;color:var(--danger)" id="stat-skipped-r">0</div>
+                <div class="stat-label">Skipped</div>
+              </div>
+              <div class="stat-card amber" style="padding:12px;text-align:center;">
+                <div class="stat-num amber" style="font-size:1.5rem" id="stat-snoozed-r">0</div>
+                <div class="stat-label">Snoozed</div>
+              </div>
+              <div class="stat-card blue" style="padding:12px;text-align:center;">
+                <div class="stat-num blue" style="font-size:1.5rem" id="stat-hydration-r">0</div>
+                <div class="stat-label">Water Glasses</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 7-day chart -->
+          <div class="card">
+            <div class="card-title mb-3"><span class="icon">📈</span> 7-Day Health Score Trend</div>
+            <div class="chart-bar-wrap" id="score-chart">
+              <div class="empty-state" style="padding:10px"><p>Complete tasks to see trends.</p></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- AI Adaptive suggestions -->
+        <div>
+          <div class="card mb-3">
+            <div class="card-title mb-3"><span class="icon">🤖</span> AI Adaptive Learning</div>
+            <div class="alert-banner info mb-3">
+              <span>💡</span> AI analyzes your skipped reminders and suggests better timings automatically.
+            </div>
+            <div id="adaptive-list">
+              <div class="empty-state"><div class="icon">🤖</div><p>Loading AI suggestions...</p></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title mb-3"><span class="icon">📊</span> Compliance Levels</div>
+            <div class="alert-banner success mb-2"><span>🌟</span> <b>&gt;80%</b> — Excellent! Keep it up!</div>
+            <div class="alert-banner info mb-2"><span>👍</span> <b>60–79%</b> — Good progress.</div>
+            <div class="alert-banner warning mb-2"><span>⚠️</span> <b>40–59%</b> — Needs improvement.</div>
+            <div class="alert-banner danger"><span>🚨</span> <b>&lt;40%</b> — Risk Alert! Caregiver notified.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CAREGIVER ALERTS PAGE ── -->
+    <div class="page" id="page-caregiver">
+      <div class="two-col">
+        <div class="card">
+          <div class="card-title mb-3"><span class="icon">🚨</span> Caregiver Alert History</div>
+          <div id="caregiver-list">
+            <div class="empty-state"><div class="icon">🚨</div><p>Loading alerts...</p></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title mb-3"><span class="icon">ℹ️</span> About Caregiver Alerts</div>
+          <div class="alert-banner danger mb-3"><span>🚨</span> Alerts are sent when <b>3+ critical medicine reminders</b> are missed in a day.</div>
+          <div style="font-size:.85rem;color:var(--text-2);line-height:1.8;">
+            <p>🔴 <b>Trigger:</b> ≥3 skipped HIGH priority reminders</p>
+            <p>📧 <b>Method:</b> Alert logged to caregiver contact</p>
+            <p>✅ <b>Resolution:</b> Mark taken to stop future alerts</p>
+            <p>🤖 <b>AI Monitor:</b> Checks compliance hourly</p>
+          </div>
+          <div class="separator"></div>
+          <button class="btn-primary" style="width:100%" onclick="loadCaregiverAlerts()">↺ Refresh Alerts</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SETTINGS PAGE ── -->
+    <div class="page" id="page-settings">
+      <div class="two-col">
+        <div class="card">
+          <div class="card-title mb-3"><span class="icon">⚙️</span> App Settings</div>
+          <form onsubmit="saveSettings(event)">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Wake-Up Time</label>
+                <input name="wake_time" type="time" class="form-control" value="06:30">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Sleep Time</label>
+                <input name="sleep_time" type="time" class="form-control" value="22:00">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Voice Language</label>
+              <select name="language" class="form-control">
+                <option value="en">🇺🇸 English</option>
+                <option value="kn">🇮🇳 Kannada</option>
+                <option value="te">🇮🇳 Telugu</option>
+                <option value="hi">🇮🇳 Hindi</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Caregiver Contact</label>
+              <input name="caregiver" class="form-control" placeholder="Phone or email">
+            </div>
+            <button type="submit" class="btn-primary" style="width:100%">💾 Save Settings</button>
+          </form>
+        </div>
+
+        <div>
+          <div class="card mb-3">
+            <div class="card-title mb-3"><span class="icon">🔧</span> System Info</div>
+            <div class="alert-banner {% if ocr_available %}success{% else %}warning{% endif %} mb-2">
+              <span>📷</span> OCR: <b>{% if ocr_available %}Active (Tesseract){% else %}Demo Mode{% endif %}</b>
+            </div>
+            <div class="alert-banner {% if tts_available %}success{% else %}info{% endif %} mb-2">
+              <span>🔊</span> TTS: <b>{% if tts_available %}gTTS Active{% else %}Web Speech API{% endif %}</b>
+            </div>
+            <div class="alert-banner {% if scheduler_available %}success{% else %}warning{% endif %} mb-2">
+              <span>⏰</span> Scheduler: <b>{% if scheduler_available %}APScheduler Running{% else %}Not available{% endif %}</b>
+            </div>
+            <div class="alert-banner info">
+              <span>🗄️</span> Database: <b>SQLite (Offline Ready)</b>
+            </div>
+          </div>
+
+          <div class="card mb-3">
+            <div class="card-title mb-3"><span class="icon">🔊</span> Voice Test</div>
+            <p style="font-size:.85rem;color:var(--text-2);margin-bottom:14px;">Test voice notifications in your selected language.</p>
+            <button class="btn-primary" style="width:100%" onclick="testVoice()">🔊 Play Test Voice</button>
+          </div>
+
+          <div class="card">
+            <div class="card-title mb-3"><span class="icon">🔔</span> Browser Notifications</div>
+            <p style="font-size:.85rem;color:var(--text-2);margin-bottom:14px;">Enable browser notifications for real-time reminders.</p>
+            <button class="btn-secondary" style="width:100%" onclick="requestNotifPermission()">🔔 Enable Notifications</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ═══════════════════════ MODALS ═══════════════════════ -->
+
+<!-- Add Medicine Modal -->
+<div class="modal-overlay" id="med-modal">
+  <div class="modal-box">
+    <div class="modal-title">💊 Add Medicine</div>
+    <form onsubmit="addMedicine(event)">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Medicine Name *</label>
+          <input name="name" class="form-control" placeholder="e.g. Metformin" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Dosage</label>
+          <input name="dosage" class="form-control" placeholder="e.g. 500mg">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Priority</label>
+        <select name="priority" class="form-control">
+          <option value="HIGH">🔴 HIGH</option>
+          <option value="MEDIUM">🟡 MEDIUM</option>
+          <option value="LOW">🟢 LOW</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Reminder Times (add up to 3)</label>
+        <div class="form-row-3">
+          <input name="time1" type="time" class="form-control" value="08:00">
+          <input name="time2" type="time" class="form-control" placeholder="Optional">
+          <input name="time3" type="time" class="form-control" placeholder="Optional">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Duration (days)</label>
+        <input name="duration" type="number" class="form-control" value="7" min="1">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal('med-modal')">Cancel</button>
+        <button type="submit" class="btn-primary">💊 Add Medicine</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div id="toast-container"></div>
+
+<script src="/static/js/app.js"></script>
 </body>
 </html>
